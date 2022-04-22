@@ -1,0 +1,198 @@
+---
+title: "Omicron Covid Variant"
+author: "Shubham"
+date: "27/01/2022"
+output:
+  html_document: default
+  pdf_document: default
+---
+# Loading packages
+```{r}
+library(tidyverse)
+library(lubridate)
+library(skimr)    # for statistical summary
+library(janitor) # for examining and cleaning dirty data.
+library(scales)
+library(dplyr)
+data<-read.csv("C:/Users/dell/OneDrive/Documents/covid-variants.csv")
+```
+*** Summary of Covid Data***
+```{r}
+glimpse(data)
+summary(data)
+str(data)
+head(data)
+```
+
+
+```{r}
+skim_without_charts(data)
+data->covid_df
+```
+
+# Rename column
+```{r}
+
+covid_df <- covid_df %>%
+  select(location, date, variant, num_sequences, perc_sequences, num_sequences_total) %>%
+  rename(num_seq_processed = num_sequences, perc_seq_processed = perc_sequences)
+
+colnames(covid_df)
+```
+
+# Unique Variants
+```{r}
+Uniq_variant = as.list(unique(covid_df$variant))
+Uniq_variant
+
+# group by variant
+variant_df <- covid_df %>%
+  group_by(variant) %>%
+  summarize(total_seq_processed = sum(num_seq_processed))
+
+head(variant_df)
+```
+
+# variant plot 
+```{r}
+options(repr.plot.width = 10, repr.plot.height = 15)
+ggplot(data = variant_df, mapping = aes(x = total_seq_processed, y = variant, fill = variant)) + 
+  geom_col(position = "dodge", color = "Black") + 
+  geom_text(aes(label = total_seq_processed),hjust = -0.05, nudge_x = 0.5, size = 4, angle = 0) +
+  labs(title = "COVID Variants vs Total number of Sequences Processed", x = "Total Sequences Processed", y = "Covid Variants", fill = "Covid Variants") +
+  scale_x_continuous(labels = scales::comma, limit = c(0, 4500000)) + 
+  theme_minimal() +
+  theme(axis.text = element_text(size = 12)) +
+  theme(axis.title = element_text(size = 20), title = element_text(size = 20))
+```
+
+# Total sequences processed <100,000
+```{r}
+options(repr.plot.width = 15, repr.plot.height = 15)
+variant_df %>%
+  filter(total_seq_processed < 100000) %>%
+  ggplot(aes(x = variant, y = total_seq_processed, fill = variant)) + 
+  geom_col(position = "dodge", color = "Black") + 
+  geom_text(aes(label = total_seq_processed),vjust = -0.2, nudge_y = 0.5, size = 4, angle = 0) +
+  labs(title = "COVID Variants vs Total number of Sequences Processed < 100,000", x = "Covid Variants", y = "Total Sequences Processed", fill = "Covid Variants") +
+  scale_y_continuous(labels = scales::comma, limits = c(0, NA)) + 
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle=90)) +
+  theme(axis.text = element_text(size = 12)) +
+  theme(axis.title = element_text(size = 20), title = element_text(size = 20))
+```
+
+
+# Total sequences processed >100,000
+```{r}
+options(repr.plot.width = 15, repr.plot.height = 15)
+variant_df %>%
+  filter(total_seq_processed > 100000) %>%
+  ggplot(aes(x = variant, y = total_seq_processed, fill = variant)) + 
+  geom_col(position = "dodge", color = "Black") + 
+  geom_text(aes(label = total_seq_processed), vjust = -0.2, nudge_y = 0.5, size = 4, angle = 0) +
+  labs(title = "COVID Variants vs Total number of Sequences Processed > 100,000", x = "Covid Variants", y = "Total Sequences Processed", fill = "Covid Variants") +
+  scale_y_continuous(labels = scales::comma, limits = c(NA, NA)) + 
+  theme_minimal() +
+  theme(axis.text = element_text(size = 12)) +
+  theme(axis.title = element_text(size = 20), title = element_text(size = 20))
+```
+
+# group by variant and location
+```{r}
+loc_variant_df <- covid_df %>%
+  group_by(location, variant) %>%
+  summarize(total_seq_processed = sum(num_seq_processed)) %>%
+  filter(total_seq_processed >0)
+head(loc_variant_df)
+
+# Variant, location plot
+options(repr.plot.width = 15, repr.plot.height = 30)
+loc_variant_df %>%
+  group_by(location, variant) %>%
+  ggplot(mapping = aes(x = total_seq_processed, y = location, fill = variant)) + 
+  geom_bar(stat = "identity") + 
+  labs(title = "Countrywise COVID Variants vs Total number of Sequences Processed", x = "Total Sequences Processed", y = "Location", fill = "Covid Variants") +
+  scale_x_continuous(labels = scales::comma) +
+  theme(axis.text = element_text(size = 12)) +
+  theme(axis.title = element_text(size = 20), title = element_text(size = 20))
+```
+
+
+# Group by location in desc. order
+```{r}
+loc_variant_df2 <- covid_df %>%
+  group_by(location) %>%
+  summarize(total_seq_processed = sum(num_seq_processed)) %>%
+  filter(total_seq_processed >0) %>%
+  arrange(desc(total_seq_processed))
+head(loc_variant_df2)
+```
+
+
+
+# variant, location plot for top 20 countries
+```{r}
+options(repr.plot.width = 15, repr.plot.height = 30)
+loc_variant_df2 %>%
+  head(20) %>%
+  group_by(location) %>%
+  ggplot(mapping = aes(x = total_seq_processed, y = reorder(location, total_seq_processed), fill = total_seq_processed)) + 
+  geom_col(position = "dodge", color = "Black") + 
+  scale_fill_gradient(low = "#132B43", high = "#56B1F7", space = "Lab", na.value = "gray50", guide = "colourbar", aesthetics = "fill") +
+  geom_text(aes(label = total_seq_processed),hjust = -0.1, nudge_x = 0.5, size = 4, angle = 0) +
+  labs(title = "COVID Variants vs Total number of Sequences Processed for Top 20 Countries", x = "Total Sequences Processed", y = "Countries", fill = "Total Seq. Processed") +
+  scale_x_continuous(labels = scales::comma, limit = c(0, 3000000)) + 
+  theme(axis.text = element_text(size = 12)) +
+  theme(axis.title = element_text(size = 20), title = element_text(size = 20))
+```
+
+# filter Omicron variant
+```{r}
+omicron_variant_df <- covid_df %>%
+  filter(variant == "Omicron")
+
+head(omicron_variant_df)
+```
+
+
+# Omicron data group by location
+```{r}
+omicron_variant_df <- omicron_variant_df %>%
+  group_by(location) %>%
+  summarize(total_seq_processed = sum(num_seq_processed)) %>%
+  arrange(desc(total_seq_processed))
+
+head(omicron_variant_df)
+```
+
+# plot
+```{r}
+options(repr.plot.width = 15, repr.plot.height = 30)
+covid_df %>%
+  filter(variant == "Omicron") %>%
+  group_by(location) %>%
+  summarize(total_seq_processed = sum(num_seq_processed)) %>%
+  ggplot(aes(x = total_seq_processed, y = location)) + 
+  geom_col(position = "dodge",fill = "Purple" , color = "Black") + 
+  labs(title = "Countrywise Omicron COVID Variant vs Total number of Sequences Processed", x = "Total Sequences Processed", y = "Countries", fill = "Countries") +
+  scale_x_continuous(labels = scales::comma) + 
+  theme(axis.text = element_text(size = 12)) +
+  theme(axis.title = element_text(size = 20), title = element_text(size = 20))
+
+```
+```{r}
+covid_df %>%
+  filter(variant == "Omicron") %>%
+  group_by(location) %>%
+  summarize(total_seq_processed = sum(num_seq_processed)) %>%
+  arrange(desc(total_seq_processed)) %>%
+  head(10) %>%
+  ggplot(aes(x = total_seq_processed, y = location)) + 
+  geom_col(position = "dodge",fill = "Purple" , color = "Black") + 
+  geom_text(aes(label = total_seq_processed),hjust = -0.1, nudge_x = 0.5, size = 4, angle = 0) +
+  labs(title = "Omicron COVID Variant vs Total number of Sequences Processed in Top 10 Countries", x = "Total Sequences Processed", y = "Countries", fill = "Countries") +
+  scale_x_continuous(labels = scales::comma, limit = c(0, 80000)) + 
+  theme(axis.text = element_text(size = 15)) +
+  theme(axis.title = element_text(size = 18), title = element_text(size = 18))
+```
